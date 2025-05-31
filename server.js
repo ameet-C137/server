@@ -1,58 +1,42 @@
-const WebSocket = require('ws');
 const express = require('express');
-const cors = require('cors');
-
 const app = express();
-app.use(cors());
-app.use(express.json());
 
+// Use a default port or the one provided by Render
 const PORT = process.env.PORT || 3000;
 
-// Simulate a store of valid keys
-let validKeys = new Set();
-
+// Basic GET route to confirm server is running
 app.get('/', (req, res) => {
-  res.send('✅ WebSocket Server is Running');
+  res.send('Live location WebSocket server is up and running!');
 });
 
-app.post('/register-key', (req, res) => {
-  const { key } = req.body;
-  if (key) {
-    validKeys.add(key);
-    res.json({ status: 'registered' });
-  } else {
-    res.status(400).json({ status: 'failed' });
-  }
-});
-
-app.post('/accept-key', (req, res) => {
-  const { key } = req.body;
-  if (validKeys.has(key)) {
-    res.json({ status: 'accepted' });
-  } else {
-    res.status(404).json({ status: 'rejected' });
-  }
-});
-
+// Start HTTP server
 const server = app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
   console.log(`✅ Server is running on port ${PORT}`);
 });
 
+// Set up WebSocket server
 const wss = new WebSocket.Server({ server });
 
+let clients = [];
+
 wss.on('connection', (ws) => {
-  console.log('🔌 Client connected');
+  console.log('🔌 New client connected');
+clients.push(ws);
 
-  ws.on('message', (message) => {
-    // Optionally broadcast
-    wss.clients.forEach(client => {
-      if (client !== ws && client.readyState === WebSocket.OPEN) {
-        client.send(message);
-      }
-    });
-  });
+ws.on('message', (message) => {
+    // Broadcast received message to all other clients
+    console.log(`📨 Message received: ${message}`);
 
-  ws.on('close', () => {
+    // Broadcast message to all other clients
+clients.forEach(client => {
+if (client !== ws && client.readyState === WebSocket.OPEN) {
+client.send(message);
+@@ -25,6 +36,7 @@ wss.on('connection', (ws) => {
+});
+
+ws.on('close', () => {
     console.log('❌ Client disconnected');
-  });
+clients = clients.filter(client => client !== ws);
+});
 });
