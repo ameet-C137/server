@@ -2,51 +2,51 @@ const express = require("express");
 const cors = require("cors");
 const WebSocket = require("ws");
 const http = require("http");
+const crypto = require("crypto");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const EXPIRATION_TIME = 30 * 1000; // 30 seconds
 
 app.use(cors());
 app.use(express.json());
 
-const EXPIRATION_TIME = 30 * 1000; // 30 seconds
-let registeredKeys = new Map(); // key => timestamp
+const sessions = new Map(); // sessionId => { key, createdAt }
 
 app.get("/", (req, res) => {
   res.send("✅ Location Sharing Server is Running");
 });
 
-// Register key
-app.post("/register-key", (req, res) => {
+// Create session when QR is generated
+app.post("/create-session", (req, res) => {
   const { key } = req.body;
-  if (!key) return res.status(400).send("Key is required.");
-  registeredKeys.set(key, Date.now());
-  console.log("✅ Registered key:", key.slice(0, 10), "...");
-  res.send({ success: true });
+  if (!key) return res.status(400).send("Key is required");
+
+  const sessionId = crypto.randomUUID();
+  sessions.set(sessionId, { key, createdAt: Date.now() });
+
+  res.send({ sessionId });
 });
 
-// Accept key
-app.post("/accept-key", (req, res) => {
-  const { key } = req.body;
-  const createdAt = registeredKeys.get(key);
-  const now = Date.now();
+// Peer accepts session
+app.post("/consume-session", (req, res) => {
+  const { sessionId } = req.body;
+  const session = sessions.get(sessionId);
 
-  if (!createdAt || now - createdAt > EXPIRATION_TIME) {
-    return res.status(404).send({ success: false, message: "Key not found or expired" });
+  if (!session || Date.now() - session.createdAt > EXPIRATION_TIME) {
+    return res.status(404).send({ success: false, message: "Invalid or expired session" });
   }
 
-  registeredKeys.delete(key); // one-time use
-  console.log("🔐 Accepted key:", key.slice(0, 10));
-  res.send({ success: true });
+  sessions.delete(sessionId); // one-time use
+  res.send({ success: true, key: session.key });
 });
 
-// Clean expired keys every 10 seconds
+// Clean expired sessions
 setInterval(() => {
   const now = Date.now();
-  for (const [key, time] of registeredKeys) {
-    if (now - time > EXPIRATION_TIME) {
-      registeredKeys.delete(key);
-      console.log("🧹 Expired key removed:", key.slice(0, 10));
+  for (const [id, session] of sessions.entries()) {
+    if (now - session.createdAt > EXPIRATION_TIME) {
+      sessions.delete(id);
     }
   }
 }, 10000);
