@@ -1,12 +1,18 @@
 {
-  "name": "location-sharing-backend",
+  "name": "live-location-server",
   "version": "1.0.0",
+  "description": "WebSocket backend for live location sharing",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.18.2",
-    "ws": "^8.13.0"
-  }
+    "ws": "^8.13.0",
+    "cors": "^2.8.5"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "license": "MIT"
 }
